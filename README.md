@@ -1,5 +1,11 @@
 # 🌊 AquaAlert IoT Platform
 
+![CI](https://github.com/Juan-Montes/aquaalert-platform/actions/workflows/ci.yml/badge.svg)
+![License](https://img.shields.io/badge/license-MIT-blue.svg)
+![LoRaWAN](https://img.shields.io/badge/protocol-LoRaWAN-orange.svg)
+![Made in Jalisco](https://img.shields.io/badge/made%20in-Jalisco%20🇲🇽-green.svg)
+
+
 Plataforma de monitoreo ambiental en tiempo real basada en **LoRaWAN + FastAPI + TimescaleDB + ChirpStack**.
 
 ## Stack
