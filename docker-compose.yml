@@ -1,0 +1,152 @@
+version: '3.8'
+
+services:
+
+  # ─── ChirpStack Network Server ───────────────────────
+  chirpstack:
+    image: chirpstack/chirpstack:4
+    command: -c /etc/chirpstack
+    restart: unless-stopped
+    volumes:
+      - ./services/chirpstack:/etc/chirpstack
+    depends_on:
+      - postgres
+      - mosquitto
+      - redis
+    environment:
+      - MQTT_BROKER_URI=tcp://mosquitto:1883
+    ports:
+      - "8080:8080"    # ChirpStack UI
+    networks:
+      - aquaalert-net
+
+  # ─── ChirpStack Gateway Bridge ───────────────────────
+  chirpstack-gateway-bridge:
+    image: chirpstack/chirpstack-gateway-bridge:4
+    restart: unless-stopped
+    ports:
+      - "1700:1700/udp"   # Tu Dragino apunta aquí
+    environment:
+      - INTEGRATION__MQTT__EVENT_TOPIC_TEMPLATE=us915/gateway/{{ .GatewayID }}/event/{{ .EventType }}
+      - INTEGRATION__MQTT__SERVER=tcp://mosquitto:1883
+    depends_on:
+      - mosquitto
+    networks:
+      - aquaalert-net
+
+  # ─── MQTT Broker ─────────────────────────────────────
+  mosquitto:
+    image: eclipse-mosquitto:2
+    restart: unless-stopped
+    ports:
+      - "1883:1883"
+      - "9001:9001"    # WebSocket
+    volumes:
+      - ./infra/mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf
+      - mosquitto_data:/mosquitto/data
+    networks:
+      - aquaalert-net
+
+  # ─── Base de datos relacional ─────────────────────────
+  postgres:
+    image: postgres:15
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: chirpstack
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./infra/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - aquaalert-net
+
+  # ─── TimescaleDB (time-series para sensores) ──────────
+  timescaledb:
+    image: timescale/timescaledb:latest-pg15
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${TIMESCALE_USER}
+      POSTGRES_PASSWORD: ${TIMESCALE_PASSWORD}
+      POSTGRES_DB: aquaalert_ts
+    ports:
+      - "5433:5432"
+    volumes:
+      - timescale_data:/var/lib/postgresql/data
+    networks:
+      - aquaalert-net
+
+  # ─── Redis (cache + pub/sub) ──────────────────────────
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    volumes:
+      - redis_data:/data
+    networks:
+      - aquaalert-net
+
+  # ─── FastAPI (nuestra API) ────────────────────────────
+  api:
+    build:
+      context: ./services/api
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://${TIMESCALE_USER}:${TIMESCALE_PASSWORD}@timescaledb:5432/aquaalert_ts
+      - MQTT_BROKER=mosquitto
+      - MQTT_PORT=1883
+      - REDIS_URL=redis://redis:6379
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - SECRET_KEY=${SECRET_KEY}
+    depends_on:
+      - timescaledb
+      - mosquitto
+      - redis
+    volumes:
+      - ./services/api:/app   # Hot reload en desarrollo
+    networks:
+      - aquaalert-net
+
+  # ─── Simulador de nodo LoRa ───────────────────────────
+  node-simulator:
+    build:
+      context: ./services/simulator
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      - MQTT_BROKER=mosquitto
+      - DEVICE_EUI=${SIM_DEVICE_EUI}
+      - SIM_INTERVAL=30   # segundos entre lecturas simuladas
+    depends_on:
+      - mosquitto
+    networks:
+      - aquaalert-net
+
+  # ─── Grafana ──────────────────────────────────────────
+  grafana:
+    image: grafana/grafana:10.4.0
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD}
+      - GF_INSTALL_PLUGINS=grafana-clock-panel,grafana-worldmap-panel
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning
+      - ./grafana/dashboards:/var/lib/grafana/dashboards
+    networks:
+      - aquaalert-net
+
+volumes:
+  postgres_data:
+  timescale_data:
+  redis_data:
+  mosquitto_data:
+  grafana_data:
+
+networks:
+  aquaalert-net:
+    driver: bridge
