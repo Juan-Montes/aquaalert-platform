@@ -353,6 +353,28 @@ FastAPI (mqtt_client.py)
 
 ---
 
+## 🐛 Bugs encontrados durante setup del CI
+
+### Bug 1 — Conflicto de dependencias paho-mqtt
+Síntoma: CI falla en "Install dependencies"
+Causa:   paho-mqtt==2.0.0 explícito + aiomqtt==2.0.0
+         que internamente requiere paho-mqtt<2.0.0
+Fix:     Eliminar paho-mqtt del requirements.txt
+         y dejar que aiomqtt lo gestione
+
+### Bug 2 — Test con valor de redondeo incorrecto
+Síntoma: assert 67 == 66 → FAILED
+Causa:   round((3800-3000)/(4200-3000)*100) = 66.66 → 67
+         el test esperaba 66
+Fix:     Corregir el assert a 67 en test_decoder.py
+
+### Bug 3 — Ruff E712 en SQLAlchemy query
+Síntoma: ruff E712 Avoid equality comparisons to True
+Causa:   Device.is_active == True en sensors.py
+Fix:     Device.is_active.is_(True)
+         SQLAlchemy tiene método específico para booleans
+
+
 *Stack: LoRaWAN + ChirpStack v4 + FastAPI + TimescaleDB + Grafana*
 *Hardware: Heltec CubeCell AB02 + JSN-SR04T + Dragino DLOS8N*
 *Desarrollado en Guadalajara, Jalisco, México 🇲🇽*
