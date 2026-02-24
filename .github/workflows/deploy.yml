@@ -1,13 +1,60 @@
-name: Deploy
+name: Deploy to Production
 
 on:
   push:
     branches: [main]
+  workflow_dispatch:        # permite disparar manualmente desde GitHub
 
 jobs:
-  placeholder:
+  # ────────────────────────────────────────────────────
+  # Deploy via SSH al VPS
+  # Secrets requeridos en GitHub → Settings → Secrets:
+  #   VPS_HOST      → IP o dominio del servidor
+  #   VPS_USER      → usuario SSH (ej: ubuntu)
+  #   VPS_SSH_KEY   → clave privada SSH (cat ~/.ssh/id_rsa)
+  # ────────────────────────────────────────────────────
+  deploy:
+    name: 🚀 Deploy
     runs-on: ubuntu-latest
+
+    # Solo corre si hay un VPS configurado
+    # Si VPS_HOST está vacío, el job se salta sin error
+    if: ${{ vars.DEPLOY_ENABLED == 'true' }}
+
     steps:
-      - uses: actions/checkout@v4
-      - name: Deploy placeholder - will be implemented in ci/github-actions branch
-        run: echo "Deploy pipeline pending implementation"
+      - name: ⬇️ Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🔑 Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts
+
+      - name: 🚀 Deploy via SSH
+        run: |
+          ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'ENDSSH'
+            set -e
+            cd ~/aquaalert-platform
+
+            echo "📥 Pulling latest code..."
+            git pull origin main
+
+            echo "🐳 Rebuilding containers..."
+            docker compose -f docker-compose.prod.yml pull
+            docker compose -f docker-compose.prod.yml up -d --build
+
+            echo "🧹 Cleaning old images..."
+            docker image prune -f
+
+            echo "✅ Deploy complete!"
+            docker compose -f docker-compose.prod.yml ps
+          ENDSSH
+
+      - name: 📬 Notify deploy (optional)
+        if: always()
+        run: |
+          echo "Deploy status: ${{ job.status }}"
+          echo "Commit: ${{ github.sha }}"
+          echo "Branch: ${{ github.ref_name }}"
