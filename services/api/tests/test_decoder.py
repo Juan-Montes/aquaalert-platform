@@ -17,7 +17,7 @@ class TestDecodePayload:
 
         assert result["distance_cm"] == 250.0
         assert result["battery_mv"] == 3800
-        assert result["battery_pct"] == 66  # (3800-3000)/(4200-3000)*100
+        assert result["battery_pct"] == 67  # round(800/1200*100) = 67
 
     def test_critical_level(self):
         """Distancia muy corta = río cerca del sensor = nivel crítico"""
