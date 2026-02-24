@@ -1,5 +1,6 @@
 # 📋 AquaAlert — Guía de Referencia Git & GitHub
 > Lecciones aprendidas en el proceso de desarrollo
+> Proyecto: AquaAlert IoT Platform — Guadalajara, Jalisco 🇲🇽
 
 ---
 
@@ -19,6 +20,8 @@ main  ──●────────────●────────�
 3. Ramas cortas → máximo 3 días de vida
 4. Siempre partir de main actualizado
 5. NUNCA usar sudo con comandos git o archivos del proyecto
+6. Verificar git status ANTES de cualquier checkout
+7. Mergear PR ANTES de borrar la rama
 ```
 
 ---
@@ -47,7 +50,7 @@ gh pr create \
   --title "tipo(scope): descripción" \
   --body "Detalle de qué hace este PR"
 
-# ── 6. Mergear PR ← PASO MÁS IMPORTANTE, NO OLVIDAR ──
+# ── 6. Mergear PR ← NO OLVIDAR ESTE PASO ─────────────
 gh pr merge N --squash --delete-branch
 
 # ── 7. Actualizar main local + limpiar ────────────────
@@ -71,15 +74,22 @@ Tipos:
   ci        → cambios en GitHub Actions / pipelines
 
 Ejemplos reales del proyecto:
-  feat(api): add water level endpoint
-  feat(decoder): implement JSN-SR04T payload parser
+  feat(api): add FastAPI application entry point with lifespan
+  feat(decoder): implement JSN-SR04T payload decoder
   feat(mqtt): add async MQTT client for ChirpStack uplinks
   feat(alerts): add threshold evaluation and Telegram notifications
+  feat(models): add SensorReading and Device ORM models
+  feat(api): add sensors and devices REST endpoints
+  feat(simulator): add LoRa node simulator for dev testing
   fix(mqtt): reconnect on broker timeout
-  chore(docker): add timescaledb service
+  chore(docker): add full stack docker-compose
+  chore(chirpstack): add ChirpStack v4 network server config
+  chore(grafana): add datasource and dashboard provisioning
   docs(readme): add status badges
-  test(decoder): add battery percentage edge cases
-  ci: add pytest step to workflow
+  docs: add git workflow reference guide
+  test(decoder): add unit tests for JSN-SR04T payload decoder
+  ci: implement real CI pipeline with pytest and docker build
+  ci(deploy): add SSH deploy workflow to VPS
 ```
 
 ---
@@ -90,13 +100,14 @@ Ejemplos reales del proyecto:
 feat/fastapi-main
 feat/mqtt-services
 feat/sensor-models
-feat/payload-decoder
+feat/rest-endpoints
 feat/node-simulator
 fix/mqtt-reconnect-timeout
-chore/chirpstack-config
+chore/infra-base
+chore/docker-compose
+chore/chirpstack-cfg
 chore/grafana-provisioning
-chore/docker-compose-stack
-ci/github-actions-pipeline
+ci/github-actions
 docs/readme-badges
 docs/git-workflow-guide
 test/decoder-unit-tests
@@ -104,20 +115,67 @@ test/decoder-unit-tests
 
 ---
 
-## 🔒 Branch Protection — Situaciones especiales
+## 🔒 Branch Protection — Ruleset en GitHub
+
+### Configuración del Ruleset:
+```
+Settings → Rules → Rulesets → Edit
+
+Enforcement status:  Active ✅        ← Disabled = no funciona
+Target branches:     Include default branch ✅
+
+Branch protections:
+  ✅ Require a pull request before merging
+       └─ Required approvals: 0
+       └─ Dismiss stale reviews when new commits pushed: ✅
+  ✅ Require linear history
+  ✅ Require status checks to pass          ← activar con CI real
+       └─ Require branches to be up to date before merging: ✅
+       └─ Add checks → buscar: "test-api"
+  ❌ Todo lo demás
+
+Nota: repos privados con cuenta Free no aplican las reglas.
+Hacer el repo PÚBLICO para que funcionen.
+```
+
+### Cómo agregar el check "test-api":
+```
+1. Ir a Settings → Rules → Rulesets → Edit
+2. Marcar "Require status checks to pass"
+3. Clic en "+ Add checks"
+4. Buscar y seleccionar: test-api
+5. Marcar: "Require branches to be up to date before merging"
+6. Save changes
+
+⚠️ test-api solo aparece en el buscador después de que
+   el CI haya corrido al menos UNA vez en GitHub Actions
+```
+
+### Verificar que la protección funciona:
+```bash
+echo "test" >> README.md
+git add . && git commit -m "test: direct push blocked"
+git push origin main
+# Debe salir: "Changes must be made through a pull request" ✅
+git reset --hard HEAD~1   # limpiar el commit de prueba
+```
+
+---
+
+## 🔒 Merge — Situaciones especiales
 
 ### Cuando el merge falla por reglas del ruleset:
 ```bash
 # Error que verás:
 # "Pull request is not mergeable: the base branch policy prohibits the merge"
 
-# Opción A — Esperar que el CI pase:
+# Opción A — Esperar que el CI pase y reintentar:
 gh pr checks N
 gh pr merge N --squash --delete-branch
 
-# Opción B — Merge como administrador (cuando CI es placeholder):
+# Opción B — Merge como administrador (CI placeholder):
 gh pr merge N --squash --delete-branch --admin
-# ✅ Usar mientras el CI real no está implementado
+# ✅ Válido mientras el CI real no está implementado
 
 # Opción C — Auto-merge cuando pasen los checks:
 gh pr merge N --squash --delete-branch --auto
@@ -127,44 +185,42 @@ gh pr merge N --squash --delete-branch --auto
 ```
 ✅ CI todavía es placeholder (no tiene tests reales)
 ✅ Eres el único desarrollador
-✅ Sabes que el código está correcto manualmente
-❌ NO usar cuando el CI real con pytest ya esté activo
+✅ Sabes que el código está correcto
+❌ NO usar cuando CI real + status check estén activos
 ```
 
-### Cuándo ya NO necesitarás --admin:
+### Cuándo ya NO necesitas --admin:
 ```
-Cuando ci/github-actions esté implementado con:
-  - pytest corriendo tests reales
-  - El Ruleset tenga "Require status checks: test-api"
-  Entonces el CI valida automáticamente y --admin
-  ya no es necesario
+Cuando ci/github-actions esté mergeado Y el Ruleset
+tenga "Require status checks: test-api" configurado.
+El CI valida automáticamente cada PR → merge normal.
 ```
 
 ---
 
 ## ⚠️ Errores comunes y soluciones
 
-### Error: "no se puede pull con rebase: tienes cambios sin marcar"
+### "no se puede pull con rebase: tienes cambios sin marcar"
 ```bash
-# Causa: intentaste cambiar de rama con archivos modificados sin commit
-# Solución A (si los cambios van en esta rama):
+# Causa: cambiar de rama con archivos modificados sin commit
+# Solución A — commit en esta rama:
 git add . && git commit -m "tipo: descripción"
 git checkout main
 
-# Solución B (guardar temporalmente):
-git stash push -m "descripción del WIP"
+# Solución B — guardar temporalmente:
+git stash push -m "descripción WIP"
 git checkout main
-# Cuando regreses:
+# Al regresar:
 git checkout mi-rama && git stash pop
 ```
 
-### Error: "rama adelantada a origin/main por 1 commit"
+### "rama adelantada a origin/main por 1 commit"
 ```bash
-# Causa: tienes commits locales sin pushear
+# Causa: commits locales sin pushear
 git push origin main
 ```
 
-### Error: "rama detrás de origin/main por 1 commit"
+### "rama detrás de origin/main por 1 commit"
 ```bash
 # Causa: origin tiene cambios que no tienes local
 git pull origin main
@@ -172,14 +228,13 @@ git pull origin main
 
 ### Warning: "borrando rama que aún no ha sido fusionada a HEAD"
 ```bash
-# SEÑAL DE ALERTA: el PR no fue mergeado todavía
-# Solución: mergear ANTES de borrar
+# SEÑAL DE ALERTA → el PR NO fue mergeado todavía
+# Solución: mergear primero, luego borrar
 gh pr merge N --squash --delete-branch
-# Luego sí borrar:
 git branch -d nombre-rama
 ```
 
-### Error: "Permiso denegado" al editar archivos del proyecto
+### "Permiso denegado" al editar archivos del proyecto
 ```bash
 # Causa: archivos creados con sudo
 ls -la .github/workflows/
@@ -188,11 +243,11 @@ sudo chown -R $USER:$USER ~/Github/aquaalert-platform/
 # Regla: NUNCA usar sudo con git o archivos del proyecto
 ```
 
-### Error: "GH006/GH013 Protected branch update failed"
+### "GH006/GH013 Protected branch update failed"
 ```bash
-# Causa: push directo a main con branch protection activa
-# Eso es correcto → la protección funciona ✅
-# Solución: revertir commit local y usar rama + PR
+# Causa: push directo a main con protección activa
+# La protección está funcionando correctamente ✅
+# Solución: revertir y usar rama + PR
 git reset --hard HEAD~1
 git checkout -b feat/mi-fix
 ```
@@ -202,7 +257,7 @@ git checkout -b feat/mi-fix
 ## 🔍 Comandos de diagnóstico frecuentes
 
 ```bash
-# Estado del árbol de trabajo (ejecutar SIEMPRE antes de checkout)
+# Estado del árbol (ejecutar SIEMPRE antes de checkout)
 git status
 
 # Historial limpio
@@ -229,44 +284,13 @@ git branch --merged main | grep -v "main" | xargs git branch -d
 
 ## 🚀 Cuándo agregar rama "develop"
 
-Agrégala cuando ocurra alguna de estas condiciones:
 ```
 ✅ Se une otro desarrollador al proyecto
 ✅ Tienes clientes pagando y necesitas staging
 ✅ El proyecto crece a +5 features en paralelo
 ✅ Necesitas entorno de pruebas separado de producción
-```
-Por ahora: **main → feat/* → PR → main** es suficiente.
 
----
-
-## 🌐 Configuración del Ruleset (GitHub)
-
-```
-Settings → Rules → Rulesets → Edit
-
-Enforcement status:  Active ✅        ← Disabled = no funciona
-Target branches:     Include default branch ✅
-
-Branch protections:
-  ✅ Require a pull request before merging
-       └─ Required approvals: 0
-       └─ Dismiss stale reviews: ✅
-  ✅ Require linear history
-  ❌ Require status checks  ← activar cuando CI real esté listo
-  ❌ Todo lo demás
-
-Nota: repos privados con cuenta Free no aplican las reglas
-→ hacer el repo PÚBLICO para que funcionen.
-```
-
-### Verificar que la protección funciona:
-```bash
-echo "test" >> README.md
-git add . && git commit -m "test: direct push blocked"
-git push origin main
-# Debe salir: "Changes must be made through a pull request" ✅
-git reset --hard HEAD~1   # limpiar el commit de prueba
+Por ahora: main → feat/* → PR → main es suficiente
 ```
 
 ---
@@ -278,36 +302,57 @@ git reset --hard HEAD~1   # limpiar el commit de prueba
 ✅ chore/infra-base           → mosquitto, postgres, nginx, .env, README
 ✅ chore/docker-compose       → docker-compose.yml completo (9 servicios)
 ✅ feat/api-core              → requirements, Dockerfile, config, database
-✅ feat/sensor-models         → SensorReading, Device ORM (TimescaleDB)
+✅ feat/sensor-models         → SensorReading y Device ORM (TimescaleDB)
 ✅ feat/rest-endpoints        → routers sensors y devices (CRUD completo)
 ✅ feat/node-simulator        → simulador CubeCell + JSN-SR04T via MQTT
 ✅ chore/grafana-provisioning → datasources y dashboards auto-provisioned
-✅ test/decoder-unit-tests    → tests unitarios con pytest
-✅ docs/readme-badges         → badges CI, license, LoRaWAN, Made in Jalisco
+✅ test/decoder-unit-tests    → tests unitarios del decoder con pytest
+✅ docs/readme-badges         → badges CI, license, LoRaWAN, Jalisco 🇲🇽
 ✅ docs/git-workflow-guide    → esta guía en docs/FLUJO-TRABAJO-GIT.md
 ```
 
-### ✅ Fase 2 — Lógica de negocio (en progreso)
+### ✅ Fase 2 — Lógica de negocio (completada)
 ```
 ✅ feat/fastapi-main     → main.py: lifespan, CORS, routers, /health
 ✅ feat/mqtt-services    → decoder.py + alert_service.py + mqtt_client.py
-
-🔜 chore/chirpstack-cfg  → chirpstack.toml (config servidor LoRaWAN)
-🔜 ci/github-actions     → ci.yml y deploy.yml reales con pytest + SSH deploy
+✅ chore/chirpstack-cfg  → chirpstack.toml: PostgreSQL, Redis, US915, MQTT
+✅ ci/github-actions     → ci.yml real (pytest + ruff + docker build)
+                           deploy.yml (SSH deploy a VPS)
 ```
 
-### 🔜 Fase 3 — Operación (próxima)
+### 🔜 Fase 3 — Primer arranque (siguiente)
 ```
-🔜 primer docker compose up   → stack completo funcionando local
-🔜 conectar gateway Dragino   → UDP 1700 → ChirpStack
-🔜 conectar CubeCell físico   → primer uplink real end-to-end
-🔜 dashboard Grafana          → panels de nivel y batería
-🔜 test alertas Telegram      → simular nivel crítico
+🔜 docker compose up     → stack completo funcionando local
+🔜 ChirpStack UI         → registrar gateway Dragino DLOS8N
+🔜 CubeCell físico       → primer uplink real end-to-end
+🔜 Grafana dashboards    → panels nivel de agua y batería
+🔜 Test Telegram         → simular escenario CRITICAL
+🔜 Activar status check  → agregar test-api al Ruleset
 ```
 
 ---
 
-*Proyecto: AquaAlert IoT Platform*
+## 🏗️ Arquitectura del stack
+
+```
+Nodo CubeCell AB02 + JSN-SR04T
+    ↓ LoRaWAN 915MHz
+Gateway Dragino DLOS8N
+    ↓ UDP :1700
+ChirpStack v4 (Network Server)
+    ↓ MQTT → mosquitto:1883
+    topic: application/+/device/+/event/up
+FastAPI (mqtt_client.py)
+    ├── decoder.py       → bytes → distance_cm, battery_pct
+    ├── alert_service.py → fill_pct → NORMAL/WATCH/WARNING/CRITICAL
+    └── TimescaleDB      → SensorReading hypertable
+         ↓
+      Grafana :3000      → dashboards tiempo real
+      Telegram Bot       → alertas push al celular
+```
+
+---
+
 *Stack: LoRaWAN + ChirpStack v4 + FastAPI + TimescaleDB + Grafana*
 *Hardware: Heltec CubeCell AB02 + JSN-SR04T + Dragino DLOS8N*
 *Desarrollado en Guadalajara, Jalisco, México 🇲🇽*
