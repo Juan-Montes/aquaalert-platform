@@ -7,9 +7,99 @@ on:
     branches: [main]
 
 jobs:
-  placeholder:
+  # ────────────────────────────────────────────────────
+  # Job 1: Tests unitarios e integración
+  # ────────────────────────────────────────────────────
+  test-api:
+    name: 🧪 Test API
     runs-on: ubuntu-latest
+
+    services:
+      timescaledb:
+        image: timescale/timescaledb:latest-pg15
+        env:
+          POSTGRES_USER:     aquaalert
+          POSTGRES_PASSWORD: testpassword
+          POSTGRES_DB:       aquaalert_ts
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      TIMESCALE_USER:     aquaalert
+      TIMESCALE_PASSWORD: testpassword
+      TIMESCALE_DB:       aquaalert_ts
+      REDIS_URL:          redis://localhost:6379
+      MQTT_BROKER:        localhost
+      SECRET_KEY:         test-secret-key-for-ci-only
+      TELEGRAM_BOT_TOKEN: ""
+      TELEGRAM_CHAT_ID:   ""
+
     steps:
-      - uses: actions/checkout@v4
-      - name: CI placeholder - pending implementation
-        run: echo "CI pipeline pending implementation"
+      - name: ⬇️ Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🐍 Setup Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: services/api/requirements.txt
+
+      - name: 📦 Install dependencies
+        working-directory: services/api
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: 🧪 Run tests
+        working-directory: services/api
+        run: |
+          pytest tests/ \
+            -v \
+            --tb=short \
+            --asyncio-mode=auto
+
+      - name: 🔍 Lint with ruff
+        working-directory: services/api
+        run: |
+          pip install ruff
+          ruff check app/ --select=E,W,F --ignore=E501
+
+  # ────────────────────────────────────────────────────
+  # Job 2: Build Docker image (valida que el Dockerfile funciona)
+  # ────────────────────────────────────────────────────
+  build-docker:
+    name: 🐳 Build Docker
+    runs-on: ubuntu-latest
+    needs: test-api           # solo si los tests pasan
+
+    steps:
+      - name: ⬇️ Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🐳 Build API image
+        run: |
+          docker build \
+            -t aquaalert-api:${{ github.sha }} \
+            ./services/api
+
+      - name: 🐳 Build Simulator image
+        run: |
+          docker build \
+            -t aquaalert-simulator:${{ github.sha }} \
+            ./services/simulator
