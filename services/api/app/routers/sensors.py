@@ -46,7 +46,7 @@ async def list_sensors(db: AsyncSession = Depends(get_db)):
     con su última lectura.
     """
     result = await db.execute(
-        select(Device).where(Device.is_active == True)
+        select(Device).where(Device.is_active.is_(True))
     )
     devices = result.scalars().all()
 
