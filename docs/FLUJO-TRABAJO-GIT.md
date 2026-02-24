@@ -51,7 +51,7 @@ gh pr create \
 gh pr merge N --squash --delete-branch
 
 # ── 7. Actualizar main local + limpiar ────────────────
-git checkout main && git pull && git branch -d tipo/nombre-descriptivo
+git checkout main && git pull && git branch -d tipo/nombre-rama
 ```
 
 ---
@@ -72,7 +72,9 @@ Tipos:
 
 Ejemplos reales del proyecto:
   feat(api): add water level endpoint
-  feat(decoder): support JSN-SR04T payload format
+  feat(decoder): implement JSN-SR04T payload parser
+  feat(mqtt): add async MQTT client for ChirpStack uplinks
+  feat(alerts): add threshold evaluation and Telegram notifications
   fix(mqtt): reconnect on broker timeout
   chore(docker): add timescaledb service
   docs(readme): add status badges
@@ -85,17 +87,18 @@ Ejemplos reales del proyecto:
 ## 🏷️ Nomenclatura de ramas
 
 ```
-feat/docker-compose-stack
-feat/fastapi-models
-feat/mqtt-client
+feat/fastapi-main
+feat/mqtt-services
+feat/sensor-models
 feat/payload-decoder
-feat/alert-service-telegram
 feat/node-simulator
 fix/mqtt-reconnect-timeout
 chore/chirpstack-config
 chore/grafana-provisioning
+chore/docker-compose-stack
 ci/github-actions-pipeline
 docs/readme-badges
+docs/git-workflow-guide
 test/decoder-unit-tests
 ```
 
@@ -133,8 +136,8 @@ gh pr merge N --squash --delete-branch --auto
 Cuando ci/github-actions esté implementado con:
   - pytest corriendo tests reales
   - El Ruleset tenga "Require status checks: test-api"
-  Entonces el CI valida automáticamente y el merge
-  funciona normal sin flags especiales
+  Entonces el CI valida automáticamente y --admin
+  ya no es necesario
 ```
 
 ---
@@ -159,8 +162,6 @@ git checkout mi-rama && git stash pop
 ```bash
 # Causa: tienes commits locales sin pushear
 git push origin main
-# o si estás en una rama:
-git push origin nombre-rama
 ```
 
 ### Error: "rama detrás de origin/main por 1 commit"
@@ -174,7 +175,7 @@ git pull origin main
 # SEÑAL DE ALERTA: el PR no fue mergeado todavía
 # Solución: mergear ANTES de borrar
 gh pr merge N --squash --delete-branch
-# Luego sí:
+# Luego sí borrar:
 git branch -d nombre-rama
 ```
 
@@ -184,7 +185,16 @@ git branch -d nombre-rama
 ls -la .github/workflows/
 # Si ves "root root" como dueño:
 sudo chown -R $USER:$USER ~/Github/aquaalert-platform/
-# Nunca más usar sudo con git o archivos del proyecto
+# Regla: NUNCA usar sudo con git o archivos del proyecto
+```
+
+### Error: "GH006/GH013 Protected branch update failed"
+```bash
+# Causa: push directo a main con branch protection activa
+# Eso es correcto → la protección funciona ✅
+# Solución: revertir commit local y usar rama + PR
+git reset --hard HEAD~1
+git checkout -b feat/mi-fix
 ```
 
 ---
@@ -224,30 +234,9 @@ Agrégala cuando ocurra alguna de estas condiciones:
 ✅ Se une otro desarrollador al proyecto
 ✅ Tienes clientes pagando y necesitas staging
 ✅ El proyecto crece a +5 features en paralelo
-✅ Necesitas un entorno de pruebas separado de producción
+✅ Necesitas entorno de pruebas separado de producción
 ```
 Por ahora: **main → feat/* → PR → main** es suficiente.
-
----
-
-## 📦 Orden de ramas completadas
-
-```
-✅ chore/infra-base           → mosquitto, postgres, nginx, .env, README
-✅ chore/docker-compose       → docker-compose.yml completo
-✅ feat/api-core              → requirements, Dockerfile, config, database
-✅ feat/sensor-models         → SensorReading, Device ORM
-✅ feat/rest-endpoints        → routers sensors y devices
-✅ feat/node-simulator        → simulador CubeCell + JSN-SR04T
-✅ chore/grafana-provisioning → datasources y dashboards
-✅ test/decoder-unit-tests    → tests del decoder
-✅ docs/readme-badges         → badges CI, license, LoRaWAN
-
-🔜 feat/fastapi-main          → app/main.py (punto de entrada API)
-🔜 feat/mqtt-services         → mqtt_client, decoder, alert_service
-🔜 chore/chirpstack-cfg       → chirpstack.toml
-🔜 ci/github-actions          → ci.yml y deploy.yml reales con pytest
-```
 
 ---
 
@@ -256,7 +245,7 @@ Por ahora: **main → feat/* → PR → main** es suficiente.
 ```
 Settings → Rules → Rulesets → Edit
 
-Enforcement status:  Active ✅
+Enforcement status:  Active ✅        ← Disabled = no funciona
 Target branches:     Include default branch ✅
 
 Branch protections:
@@ -266,9 +255,59 @@ Branch protections:
   ✅ Require linear history
   ❌ Require status checks  ← activar cuando CI real esté listo
   ❌ Todo lo demás
+
+Nota: repos privados con cuenta Free no aplican las reglas
+→ hacer el repo PÚBLICO para que funcionen.
+```
+
+### Verificar que la protección funciona:
+```bash
+echo "test" >> README.md
+git add . && git commit -m "test: direct push blocked"
+git push origin main
+# Debe salir: "Changes must be made through a pull request" ✅
+git reset --hard HEAD~1   # limpiar el commit de prueba
 ```
 
 ---
 
-*Última actualización: durante setup inicial de aquaalert-platform*
-*Stack: LoRaWAN + ChirpStack + FastAPI + TimescaleDB + Grafana*
+## 📦 Historial de ramas — Progreso del proyecto
+
+### ✅ Fase 1 — Base del proyecto (completada)
+```
+✅ chore/infra-base           → mosquitto, postgres, nginx, .env, README
+✅ chore/docker-compose       → docker-compose.yml completo (9 servicios)
+✅ feat/api-core              → requirements, Dockerfile, config, database
+✅ feat/sensor-models         → SensorReading, Device ORM (TimescaleDB)
+✅ feat/rest-endpoints        → routers sensors y devices (CRUD completo)
+✅ feat/node-simulator        → simulador CubeCell + JSN-SR04T via MQTT
+✅ chore/grafana-provisioning → datasources y dashboards auto-provisioned
+✅ test/decoder-unit-tests    → tests unitarios con pytest
+✅ docs/readme-badges         → badges CI, license, LoRaWAN, Made in Jalisco
+✅ docs/git-workflow-guide    → esta guía en docs/FLUJO-TRABAJO-GIT.md
+```
+
+### ✅ Fase 2 — Lógica de negocio (en progreso)
+```
+✅ feat/fastapi-main     → main.py: lifespan, CORS, routers, /health
+✅ feat/mqtt-services    → decoder.py + alert_service.py + mqtt_client.py
+
+🔜 chore/chirpstack-cfg  → chirpstack.toml (config servidor LoRaWAN)
+🔜 ci/github-actions     → ci.yml y deploy.yml reales con pytest + SSH deploy
+```
+
+### 🔜 Fase 3 — Operación (próxima)
+```
+🔜 primer docker compose up   → stack completo funcionando local
+🔜 conectar gateway Dragino   → UDP 1700 → ChirpStack
+🔜 conectar CubeCell físico   → primer uplink real end-to-end
+🔜 dashboard Grafana          → panels de nivel y batería
+🔜 test alertas Telegram      → simular nivel crítico
+```
+
+---
+
+*Proyecto: AquaAlert IoT Platform*
+*Stack: LoRaWAN + ChirpStack v4 + FastAPI + TimescaleDB + Grafana*
+*Hardware: Heltec CubeCell AB02 + JSN-SR04T + Dragino DLOS8N*
+*Desarrollado en Guadalajara, Jalisco, México 🇲🇽*
