@@ -2,7 +2,7 @@
   "annotations": {
     "list": []
   },
-  "description": "AquaAlert IoT \u2014 Monitoreo de nivel de agua en tiempo real",
+  "description": "AquaAlert IoT — Monitoreo de nivel de agua en tiempo real",
   "editable": true,
   "graphTooltip": 1,
   "id": null,
@@ -17,7 +17,7 @@
         "y": 0
       },
       "id": 100,
-      "title": "\ud83c\udf0a Estado Actual",
+      "title": "🌊 Estado Actual",
       "type": "row"
     },
     {
@@ -75,7 +75,7 @@
           "values": false
         }
       },
-      "title": "\ud83d\udca7 Llenado Actual",
+      "title": "💧 Llenado Actual",
       "type": "stat",
       "targets": [
         {
@@ -134,7 +134,7 @@
           "values": false
         }
       },
-      "title": "\ud83d\udccf Nivel de Agua",
+      "title": "📏 Nivel de Agua",
       "type": "stat",
       "targets": [
         {
@@ -203,7 +203,7 @@
           "values": false
         }
       },
-      "title": "\ud83d\udd0b Bater\u00eda",
+      "title": "🔋 Batería",
       "type": "stat",
       "targets": [
         {
@@ -211,7 +211,7 @@
             "type": "postgres",
             "uid": "timescaledb"
           },
-          "rawSql": "SELECT time, battery_pct as \"Bater\u00eda %\" FROM sensor_readings WHERE device_eui = '$device_eui' ORDER BY time DESC LIMIT 1",
+          "rawSql": "SELECT time, battery_pct as \"Bateria %\" FROM sensor_readings WHERE device_eui = '$device_eui' ORDER BY time DESC LIMIT 1",
           "format": "time_series",
           "refId": "A"
         }
@@ -255,22 +255,22 @@
                 "0": {
                   "color": "green",
                   "index": 0,
-                  "text": "\ud83d\udfe2 NORMAL"
+                  "text": "🟢 NORMAL"
                 },
                 "1": {
                   "color": "yellow",
                   "index": 1,
-                  "text": "\ud83d\udfe1 WATCH"
+                  "text": "🟡 WATCH"
                 },
                 "2": {
                   "color": "orange",
                   "index": 2,
-                  "text": "\ud83d\udfe0 WARNING"
+                  "text": "🟠 WARNING"
                 },
                 "3": {
                   "color": "red",
                   "index": 3,
-                  "text": "\ud83d\udd34 CRITICAL"
+                  "text": "🔴 CRITICAL"
                 }
               }
             }
@@ -299,7 +299,7 @@
           "values": false
         }
       },
-      "title": "\ud83d\udea8 Nivel de Alerta",
+      "title": "🚨 Nivel de Alerta",
       "type": "stat",
       "targets": [
         {
@@ -307,7 +307,7 @@
             "type": "postgres",
             "uid": "timescaledb"
           },
-          "rawSql": "SELECT time,\n  CASE alert_level\n    WHEN 'NORMAL'   THEN 0\n    WHEN 'WATCH'    THEN 1\n    WHEN 'WARNING'  THEN 2\n    WHEN 'CRITICAL' THEN 3\n    ELSE 0\n  END as \"Alerta\"\nFROM sensor_readings\nWHERE device_eui = ''\nORDER BY time DESC LIMIT 1",
+          "rawSql": "SELECT time, CASE alert_level WHEN 'NORMAL' THEN 0 WHEN 'WATCH' THEN 1 WHEN 'WARNING' THEN 2 WHEN 'CRITICAL' THEN 3 ELSE 0 END as \"Alerta\" FROM sensor_readings WHERE device_eui = '$device_eui' ORDER BY time DESC LIMIT 1",
           "format": "time_series",
           "refId": "A"
         }
@@ -322,7 +322,7 @@
         "y": 9
       },
       "id": 101,
-      "title": "\ud83d\udcc8 Hist\u00f3rico",
+      "title": "📈 Historico",
       "type": "row"
     },
     {
@@ -391,7 +391,7 @@
           "mode": "multi"
         }
       },
-      "title": "\ud83d\udca7 Nivel de Agua (cm)",
+      "title": "💧 Nivel de Agua (cm)",
       "type": "timeseries",
       "targets": [
         {
@@ -459,7 +459,7 @@
         "showThresholdLabels": true,
         "showThresholdMarkers": true
       },
-      "title": "\ud83d\udcca % Llenado",
+      "title": "📊 % Llenado",
       "type": "gauge",
       "targets": [
         {
@@ -482,7 +482,7 @@
         "y": 20
       },
       "id": 102,
-      "title": "\ud83d\udce1 Se\u00f1al LoRa y Bater\u00eda",
+      "title": "📡 Señal LoRa y Bateria",
       "type": "row"
     },
     {
@@ -560,7 +560,7 @@
           "mode": "multi"
         }
       },
-      "title": "\ud83d\udce1 Se\u00f1al LoRaWAN (RSSI / SNR)",
+      "title": "📡 Señal LoRaWAN (RSSI / SNR)",
       "type": "timeseries",
       "targets": [
         {
@@ -637,7 +637,7 @@
           "mode": "single"
         }
       },
-      "title": "\ud83d\udd0b Bater\u00eda Hist\u00f3rico (%)",
+      "title": "🔋 Bateria Historico (%)",
       "type": "timeseries",
       "targets": [
         {
@@ -645,7 +645,7 @@
             "type": "postgres",
             "uid": "timescaledb"
           },
-          "rawSql": "SELECT time, battery_pct as \"Bater\u00eda\" FROM sensor_readings WHERE device_eui = '$device_eui' AND $__timeFilter(time) ORDER BY time ASC",
+          "rawSql": "SELECT time, battery_pct as \"Bateria\" FROM sensor_readings WHERE device_eui = '$device_eui' AND $__timeFilter(time) ORDER BY time ASC",
           "format": "time_series",
           "refId": "A"
         }
@@ -683,7 +683,7 @@
     "to": "now"
   },
   "timezone": "America/Mexico_City",
-  "title": "AquaAlert \u2014 Monitor de Nivel",
+  "title": "AquaAlert — Monitor de Nivel",
   "uid": "aquaalert-water-level",
-  "version": 3
+  "version": 4
 }
