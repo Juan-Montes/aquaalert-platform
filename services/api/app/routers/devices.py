@@ -45,6 +45,9 @@ async def create_device(
     db: AsyncSession = Depends(get_db)
 ):
     """Registra un nuevo nodo sensor."""
+    # Normalizar EUI siempre a mayúsculas
+    data.device_eui = data.device_eui.upper()
+
     # Verificar si ya existe
     existing = await db.get(Device, data.device_eui)
     if existing:
