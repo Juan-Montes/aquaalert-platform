@@ -21,15 +21,16 @@
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "green", "value": null },
+              { "color": "green",  "value": null },
               { "color": "yellow", "value": 50 },
               { "color": "orange", "value": 70 },
-              { "color": "red", "value": 85 }
+              { "color": "red",    "value": 85 }
             ]
           },
           "unit": "percent",
           "min": 0,
-          "max": 100
+          "max": 100,
+          "decimals": 1
         }
       },
       "gridPos": { "h": 8, "w": 6, "x": 0, "y": 1 },
@@ -45,8 +46,8 @@
       "targets": [
         {
           "datasource": { "type": "postgres", "uid": "timescaledb" },
-          "rawSql": "SELECT NOW() as time, fill_pct as \"Llenado %\" FROM sensor_readings WHERE device_eui = '$device_eui' ORDER BY time DESC LIMIT 1",
-          "format": "table",
+          "rawSql": "SELECT time, fill_pct as \"Llenado %\" FROM sensor_readings WHERE device_eui = '$device_eui' ORDER BY time DESC LIMIT 1",
+          "format": "time_series",
           "refId": "A"
         }
       ]
@@ -60,10 +61,10 @@
             "mode": "absolute",
             "steps": [
               { "color": "green", "value": null },
-              { "color": "red", "value": 200 }
+              { "color": "red",   "value": 200 }
             ]
           },
-          "unit": "lengthcm",
+          "unit": "suffix:cm",
           "decimals": 1
         }
       },
@@ -80,8 +81,8 @@
       "targets": [
         {
           "datasource": { "type": "postgres", "uid": "timescaledb" },
-          "rawSql": "SELECT NOW() as time, water_level_cm as \"Nivel cm\" FROM sensor_readings WHERE device_eui = '$device_eui' ORDER BY time DESC LIMIT 1",
-          "format": "table",
+          "rawSql": "SELECT time, water_level_cm as \"Nivel\" FROM sensor_readings WHERE device_eui = '$device_eui' ORDER BY time DESC LIMIT 1",
+          "format": "time_series",
           "refId": "A"
         }
       ]
@@ -94,15 +95,16 @@
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "red", "value": null },
+              { "color": "red",    "value": null },
               { "color": "orange", "value": 20 },
               { "color": "yellow", "value": 40 },
-              { "color": "green", "value": 60 }
+              { "color": "green",  "value": 60 }
             ]
           },
           "unit": "percent",
           "min": 0,
-          "max": 100
+          "max": 100,
+          "decimals": 0
         }
       },
       "gridPos": { "h": 8, "w": 6, "x": 12, "y": 1 },
@@ -118,8 +120,8 @@
       "targets": [
         {
           "datasource": { "type": "postgres", "uid": "timescaledb" },
-          "rawSql": "SELECT NOW() as time, battery_pct as \"Batería %\" FROM sensor_readings WHERE device_eui = '$device_eui' ORDER BY time DESC LIMIT 1",
-          "format": "table",
+          "rawSql": "SELECT time, battery_pct as \"Batería %\" FROM sensor_readings WHERE device_eui = '$device_eui' ORDER BY time DESC LIMIT 1",
+          "format": "time_series",
           "refId": "A"
         }
       ]
@@ -128,12 +130,19 @@
       "datasource": { "type": "postgres", "uid": "timescaledb" },
       "fieldConfig": {
         "defaults": {
+          "color": { "mode": "fixed", "fixedColor": "green" },
           "mappings": [
-            { "options": { "NORMAL":   { "color": "green",  "index": 0, "text": "🟢 NORMAL" }   }, "type": "value" },
-            { "options": { "WATCH":    { "color": "yellow", "index": 1, "text": "🟡 WATCH" }    }, "type": "value" },
-            { "options": { "WARNING":  { "color": "orange", "index": 2, "text": "🟠 WARNING" }  }, "type": "value" },
-            { "options": { "CRITICAL": { "color": "red",    "index": 3, "text": "🔴 CRITICAL" } }, "type": "value" }
-          ]
+            {
+              "type": "value",
+              "options": {
+                "NORMAL":   { "color": "green",  "index": 0, "text": "🟢 NORMAL" },
+                "WATCH":    { "color": "yellow", "index": 1, "text": "🟡 WATCH" },
+                "WARNING":  { "color": "orange", "index": 2, "text": "🟠 WARNING" },
+                "CRITICAL": { "color": "red",    "index": 3, "text": "🔴 CRITICAL" }
+              }
+            }
+          ],
+          "unit": "string"
         }
       },
       "gridPos": { "h": 8, "w": 6, "x": 18, "y": 1 },
@@ -142,6 +151,7 @@
         "colorMode": "background",
         "graphMode": "none",
         "justifyMode": "center",
+        "textMode": "value",
         "reduceOptions": { "calcs": ["lastNotNull"], "values": false }
       },
       "title": "🚨 Nivel de Alerta",
@@ -149,8 +159,8 @@
       "targets": [
         {
           "datasource": { "type": "postgres", "uid": "timescaledb" },
-          "rawSql": "SELECT NOW() as time, alert_level as \"Alerta\" FROM sensor_readings WHERE device_eui = '$device_eui' ORDER BY time DESC LIMIT 1",
-          "format": "table",
+          "rawSql": "SELECT time, alert_level as \"Alerta\" FROM sensor_readings WHERE device_eui = '$device_eui' ORDER BY time DESC LIMIT 1",
+          "format": "time_series",
           "refId": "A"
         }
       ]
@@ -172,13 +182,27 @@
             "showPoints": "never",
             "spanNulls": true
           },
-          "unit": "lengthcm"
-        }
+          "unit": "suffix:cm",
+          "decimals": 1
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "Distancia sensor" },
+            "properties": [
+              { "id": "custom.lineStyle", "value": { "dash": [10, 10], "fill": "dash" } },
+              { "id": "color", "value": { "mode": "fixed", "fixedColor": "light-blue" } }
+            ]
+          }
+        ]
       },
       "gridPos": { "h": 10, "w": 16, "x": 0, "y": 10 },
       "id": 5,
       "options": {
-        "legend": { "calcs": ["min", "max", "mean", "last"], "displayMode": "table", "placement": "bottom" },
+        "legend": {
+          "calcs": ["min", "max", "mean", "last"],
+          "displayMode": "table",
+          "placement": "bottom"
+        },
         "tooltip": { "mode": "multi" }
       },
       "title": "💧 Nivel de Agua (cm)",
@@ -200,15 +224,16 @@
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "green", "value": null },
+              { "color": "green",  "value": null },
               { "color": "yellow", "value": 50 },
               { "color": "orange", "value": 70 },
-              { "color": "red", "value": 85 }
+              { "color": "red",    "value": 85 }
             ]
           },
           "unit": "percent",
           "min": 0,
-          "max": 100
+          "max": 100,
+          "decimals": 1
         }
       },
       "gridPos": { "h": 10, "w": 8, "x": 16, "y": 10 },
@@ -223,8 +248,8 @@
       "targets": [
         {
           "datasource": { "type": "postgres", "uid": "timescaledb" },
-          "rawSql": "SELECT NOW() as time, fill_pct as \"Llenado\" FROM sensor_readings WHERE device_eui = '$device_eui' ORDER BY time DESC LIMIT 1",
-          "format": "table",
+          "rawSql": "SELECT time, fill_pct as \"Llenado\" FROM sensor_readings WHERE device_eui = '$device_eui' ORDER BY time DESC LIMIT 1",
+          "format": "time_series",
           "refId": "A"
         }
       ]
@@ -243,12 +268,28 @@
           "custom": { "fillOpacity": 10, "lineWidth": 2, "showPoints": "never" }
         },
         "overrides": [
-          { "matcher": { "id": "byName", "options": "RSSI" }, "properties": [{ "id": "unit", "value": "dBm" }] },
-          { "matcher": { "id": "byName", "options": "SNR" },  "properties": [{ "id": "unit", "value": "dB" }] }
+          {
+            "matcher": { "id": "byName", "options": "RSSI" },
+            "properties": [
+              { "id": "unit", "value": "dBm" },
+              { "id": "color", "value": { "mode": "fixed", "fixedColor": "yellow" } }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "SNR" },
+            "properties": [
+              { "id": "unit", "value": "dB" },
+              { "id": "color", "value": { "mode": "fixed", "fixedColor": "light-green" } }
+            ]
+          }
         ]
       },
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 21 },
       "id": 7,
+      "options": {
+        "legend": { "calcs": ["min", "max", "last"], "displayMode": "table", "placement": "bottom" },
+        "tooltip": { "mode": "multi" }
+      },
       "title": "📡 Señal LoRaWAN (RSSI / SNR)",
       "type": "timeseries",
       "targets": [
@@ -277,11 +318,16 @@
           "custom": { "fillOpacity": 20, "lineWidth": 2, "showPoints": "never" },
           "unit": "percent",
           "min": 0,
-          "max": 100
+          "max": 100,
+          "decimals": 0
         }
       },
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 21 },
       "id": 8,
+      "options": {
+        "legend": { "calcs": ["min", "max", "last"], "displayMode": "table", "placement": "bottom" },
+        "tooltip": { "mode": "single" }
+      },
       "title": "🔋 Batería Histórico (%)",
       "type": "timeseries",
       "targets": [
@@ -317,5 +363,5 @@
   "timezone": "America/Mexico_City",
   "title": "AquaAlert — Monitor de Nivel",
   "uid": "aquaalert-water-level",
-  "version": 1
+  "version": 2
 }
