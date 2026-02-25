@@ -1,0 +1,321 @@
+{
+  "annotations": { "list": [] },
+  "description": "AquaAlert IoT — Monitoreo de nivel de agua en tiempo real",
+  "editable": true,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "id": 100,
+      "title": "🌊 Estado Actual",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "postgres", "uid": "timescaledb" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 50 },
+              { "color": "orange", "value": 70 },
+              { "color": "red", "value": 85 }
+            ]
+          },
+          "unit": "percent",
+          "min": 0,
+          "max": 100
+        }
+      },
+      "gridPos": { "h": 8, "w": 6, "x": 0, "y": 1 },
+      "id": 1,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "reduceOptions": { "calcs": ["lastNotNull"], "values": false }
+      },
+      "title": "💧 Llenado Actual",
+      "type": "stat",
+      "targets": [
+        {
+          "datasource": { "type": "postgres", "uid": "timescaledb" },
+          "rawSql": "SELECT NOW() as time, fill_pct as \"Llenado %\" FROM sensor_readings WHERE device_eui = '$device_eui' ORDER BY time DESC LIMIT 1",
+          "format": "table",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "datasource": { "type": "postgres", "uid": "timescaledb" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 200 }
+            ]
+          },
+          "unit": "lengthcm",
+          "decimals": 1
+        }
+      },
+      "gridPos": { "h": 8, "w": 6, "x": 6, "y": 1 },
+      "id": 2,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "reduceOptions": { "calcs": ["lastNotNull"], "values": false }
+      },
+      "title": "📏 Nivel de Agua",
+      "type": "stat",
+      "targets": [
+        {
+          "datasource": { "type": "postgres", "uid": "timescaledb" },
+          "rawSql": "SELECT NOW() as time, water_level_cm as \"Nivel cm\" FROM sensor_readings WHERE device_eui = '$device_eui' ORDER BY time DESC LIMIT 1",
+          "format": "table",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "datasource": { "type": "postgres", "uid": "timescaledb" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "orange", "value": 20 },
+              { "color": "yellow", "value": 40 },
+              { "color": "green", "value": 60 }
+            ]
+          },
+          "unit": "percent",
+          "min": 0,
+          "max": 100
+        }
+      },
+      "gridPos": { "h": 8, "w": 6, "x": 12, "y": 1 },
+      "id": 3,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "reduceOptions": { "calcs": ["lastNotNull"], "values": false }
+      },
+      "title": "🔋 Batería",
+      "type": "stat",
+      "targets": [
+        {
+          "datasource": { "type": "postgres", "uid": "timescaledb" },
+          "rawSql": "SELECT NOW() as time, battery_pct as \"Batería %\" FROM sensor_readings WHERE device_eui = '$device_eui' ORDER BY time DESC LIMIT 1",
+          "format": "table",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "datasource": { "type": "postgres", "uid": "timescaledb" },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            { "options": { "NORMAL":   { "color": "green",  "index": 0, "text": "🟢 NORMAL" }   }, "type": "value" },
+            { "options": { "WATCH":    { "color": "yellow", "index": 1, "text": "🟡 WATCH" }    }, "type": "value" },
+            { "options": { "WARNING":  { "color": "orange", "index": 2, "text": "🟠 WARNING" }  }, "type": "value" },
+            { "options": { "CRITICAL": { "color": "red",    "index": 3, "text": "🔴 CRITICAL" } }, "type": "value" }
+          ]
+        }
+      },
+      "gridPos": { "h": 8, "w": 6, "x": 18, "y": 1 },
+      "id": 4,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "reduceOptions": { "calcs": ["lastNotNull"], "values": false }
+      },
+      "title": "🚨 Nivel de Alerta",
+      "type": "stat",
+      "targets": [
+        {
+          "datasource": { "type": "postgres", "uid": "timescaledb" },
+          "rawSql": "SELECT NOW() as time, alert_level as \"Alerta\" FROM sensor_readings WHERE device_eui = '$device_eui' ORDER BY time DESC LIMIT 1",
+          "format": "table",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 9 },
+      "id": 101,
+      "title": "📈 Histórico",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "postgres", "uid": "timescaledb" },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "fillOpacity": 20,
+            "lineWidth": 2,
+            "showPoints": "never",
+            "spanNulls": true
+          },
+          "unit": "lengthcm"
+        }
+      },
+      "gridPos": { "h": 10, "w": 16, "x": 0, "y": 10 },
+      "id": 5,
+      "options": {
+        "legend": { "calcs": ["min", "max", "mean", "last"], "displayMode": "table", "placement": "bottom" },
+        "tooltip": { "mode": "multi" }
+      },
+      "title": "💧 Nivel de Agua (cm)",
+      "type": "timeseries",
+      "targets": [
+        {
+          "datasource": { "type": "postgres", "uid": "timescaledb" },
+          "rawSql": "SELECT time, water_level_cm as \"Nivel agua\", distance_cm as \"Distancia sensor\" FROM sensor_readings WHERE device_eui = '$device_eui' AND $__timeFilter(time) ORDER BY time ASC",
+          "format": "time_series",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "datasource": { "type": "postgres", "uid": "timescaledb" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 50 },
+              { "color": "orange", "value": 70 },
+              { "color": "red", "value": 85 }
+            ]
+          },
+          "unit": "percent",
+          "min": 0,
+          "max": 100
+        }
+      },
+      "gridPos": { "h": 10, "w": 8, "x": 16, "y": 10 },
+      "id": 6,
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "values": false },
+        "showThresholdLabels": true,
+        "showThresholdMarkers": true
+      },
+      "title": "📊 % Llenado",
+      "type": "gauge",
+      "targets": [
+        {
+          "datasource": { "type": "postgres", "uid": "timescaledb" },
+          "rawSql": "SELECT NOW() as time, fill_pct as \"Llenado\" FROM sensor_readings WHERE device_eui = '$device_eui' ORDER BY time DESC LIMIT 1",
+          "format": "table",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 20 },
+      "id": 102,
+      "title": "📡 Señal LoRa y Batería",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "postgres", "uid": "timescaledb" },
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "fillOpacity": 10, "lineWidth": 2, "showPoints": "never" }
+        },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "RSSI" }, "properties": [{ "id": "unit", "value": "dBm" }] },
+          { "matcher": { "id": "byName", "options": "SNR" },  "properties": [{ "id": "unit", "value": "dB" }] }
+        ]
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 21 },
+      "id": 7,
+      "title": "📡 Señal LoRaWAN (RSSI / SNR)",
+      "type": "timeseries",
+      "targets": [
+        {
+          "datasource": { "type": "postgres", "uid": "timescaledb" },
+          "rawSql": "SELECT time, rssi as \"RSSI\", snr as \"SNR\" FROM sensor_readings WHERE device_eui = '$device_eui' AND $__timeFilter(time) ORDER BY time ASC",
+          "format": "time_series",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "datasource": { "type": "postgres", "uid": "timescaledb" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red",    "value": null },
+              { "color": "orange", "value": 20 },
+              { "color": "yellow", "value": 40 },
+              { "color": "green",  "value": 60 }
+            ]
+          },
+          "custom": { "fillOpacity": 20, "lineWidth": 2, "showPoints": "never" },
+          "unit": "percent",
+          "min": 0,
+          "max": 100
+        }
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 21 },
+      "id": 8,
+      "title": "🔋 Batería Histórico (%)",
+      "type": "timeseries",
+      "targets": [
+        {
+          "datasource": { "type": "postgres", "uid": "timescaledb" },
+          "rawSql": "SELECT time, battery_pct as \"Batería\" FROM sensor_readings WHERE device_eui = '$device_eui' AND $__timeFilter(time) ORDER BY time ASC",
+          "format": "time_series",
+          "refId": "A"
+        }
+      ]
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 38,
+  "tags": ["aquaalert", "iot", "lorawan"],
+  "templating": {
+    "list": [
+      {
+        "datasource": { "type": "postgres", "uid": "timescaledb" },
+        "definition": "SELECT DISTINCT device_eui FROM sensor_readings ORDER BY device_eui",
+        "hide": 0,
+        "label": "Dispositivo",
+        "multi": false,
+        "name": "device_eui",
+        "query": "SELECT DISTINCT device_eui FROM sensor_readings ORDER BY device_eui",
+        "refresh": 2,
+        "sort": 1,
+        "type": "query"
+      }
+    ]
+  },
+  "time": { "from": "now-3h", "to": "now" },
+  "timezone": "America/Mexico_City",
+  "title": "AquaAlert — Monitor de Nivel",
+  "uid": "aquaalert-water-level",
+  "version": 1
+}
