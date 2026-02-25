@@ -15,6 +15,7 @@ services:
       - redis
     environment:
       - MQTT_BROKER_URI=tcp://mosquitto:1883
+      - POSTGRESQL__DSN=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres/${POSTGRES_DB}?sslmode=disable
     ports:
       - "8080:8080"    # ChirpStack UI
     networks:
