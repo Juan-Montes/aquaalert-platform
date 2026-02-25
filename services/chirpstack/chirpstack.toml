@@ -6,7 +6,7 @@
 level = "info"
 
 [postgresql]
-dsn = "postgresql://chirpstack:chirpstack@postgres/chirpstack?sslmode=disable"
+dsn = "postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres/${POSTGRES_DB}?sslmode=disable"
 max_open_connections = 10
 min_idle_connections  = 0
 

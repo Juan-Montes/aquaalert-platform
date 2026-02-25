@@ -4,10 +4,11 @@
 -- Base de datos principal de ChirpStack
 CREATE DATABASE chirpstack;
 
--- Extensión para UUIDs
 \c chirpstack
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
+-- Extensiones requeridas por ChirpStack v4
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+CREATE EXTENSION IF NOT EXISTS "pg_trgm";
 -- Crear usuario de solo lectura para Grafana (opcional)
 -- CREATE USER grafana_reader WITH PASSWORD 'grafana_readonly_pass';
 -- GRANT CONNECT ON DATABASE chirpstack TO grafana_reader;
