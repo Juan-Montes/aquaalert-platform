@@ -1,58 +1,43 @@
 # ──────────────────────────────────────────────────────
 # ChirpStack v4 — Configuración para AquaAlert
-# Documentación: https://www.chirpstack.io/docs/chirpstack/configuration.html
 # ──────────────────────────────────────────────────────
 
-# ─── Logging ──────────────────────────────────────────
 [logging]
-level = "info"          # debug | info | warn | error
+level = "info"
 
-# ─── PostgreSQL (metadata de dispositivos) ────────────
 [postgresql]
 dsn = "postgresql://chirpstack:chirpstack@postgres/chirpstack?sslmode=disable"
 max_open_connections = 10
 min_idle_connections  = 0
 
-# ─── Redis (sesiones, OTAA, deduplicación) ────────────
 [redis]
-servers   = ["redis://redis:6379"]
-cluster   = false
+servers    = ["redis://redis:6379"]
+cluster    = false
 key_prefix = "chirpstack:"
 
-# ─── Servidor de red ──────────────────────────────────
 [network]
-# Plan de frecuencias para México → AS923 o US915
-# Dragino DLOS8N soporta ambos, verificar config del gateway
-net_id           = "000000"
-enabled_regions  = ["us915_0"]   # Sub-band 0 (canales 0-7 + 64)
+net_id          = "000000"
+enabled_regions = ["us915_0"]
 
-# ─── API interna (gRPC + HTTP) ────────────────────────
 [api]
-bind             = "0.0.0.0:8080"
-secret           = "you-must-replace-this-secret-key"
+bind   = "0.0.0.0:8080"
+secret = "you-must-replace-this-secret-key"
 
-# ─── Gateway ──────────────────────────────────────────
 [gateway]
-# El gateway-bridge publica uplinks aquí via MQTT
-# Topic: gateway/{gateway_id}/event/{event_type}
 ca_cert  = ""
 tls_cert = ""
 tls_key  = ""
 
-# ─── MQTT integración (publica uplinks procesados) ────
-[[integration]]
+[integration]
 enabled = ["mqtt"]
 
 [integration.mqtt]
-# ChirpStack publica aquí los uplinks decodificados
-# Nuestro mqtt_client.py escucha este topic
 event_topic_template   = "application/{{ .ApplicationID }}/device/{{ .DevEUI }}/event/{{ .EventType }}"
 state_topic_template   = "application/{{ .ApplicationID }}/device/{{ .DevEUI }}/state/{{ .StateType }}"
 command_topic_template = "application/{{ .ApplicationID }}/device/{{ .DevEUI }}/command/{{ .CommandType }}"
-
-server   = "tcp://mosquitto:1883"
-username = ""
-password = ""
-qos      = 0
-clean_session      = true
-client_id          = "chirpstack"
+server        = "tcp://mosquitto:1883"
+username      = ""
+password      = ""
+qos           = 0
+clean_session = true
+client_id     = "chirpstack"
