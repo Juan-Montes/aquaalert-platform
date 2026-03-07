@@ -21,7 +21,9 @@ class ReadingOut(BaseModel):
     fill_pct: Optional[float]
     battery_pct: Optional[int]
     rssi: Optional[int]
-    snr: Optional[float]
+    snr:          Optional[float] = None
+    latitude:     Optional[float] = None   # None si ese uplink no trajo GPS
+    longitude:    Optional[float] = None
     alert_level: str
 
     class Config:
@@ -75,6 +77,8 @@ async def list_sensors(db: AsyncSession = Depends(get_db)):
                 battery_pct=last_reading.battery_pct,
                 rssi=last_reading.rssi,
                 snr=last_reading.snr,
+                latitude=last_reading.latitude,
+                longitude=last_reading.longitude,  
                 alert_level=last_reading.alert_level,
             ) if last_reading else None,
             alert_level=last_reading.alert_level if last_reading else "NORMAL",
@@ -125,6 +129,8 @@ async def get_readings(
             battery_pct=r.battery_pct,
             rssi=r.rssi,
             snr=r.snr,
+            latitude=r.latitude,
+            longitude=r.longitude,
             alert_level=r.alert_level,
         )
         for r in readings
@@ -161,5 +167,7 @@ async def get_latest(
         battery_pct=reading.battery_pct,
         rssi=reading.rssi,
         snr=reading.snr,
+        latitude=reading.latitude,
+        longitude=reading.longitude,
         alert_level=reading.alert_level,
     )
