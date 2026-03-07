@@ -1,66 +1,100 @@
-import pytest
+import base64
 import struct
+import pytest
 from app.services.decoder import decode_payload
 
 
-def build_payload(distance_mm: int, battery_mv: int) -> bytes:
-    """Helper: construye bytes como los enviaría el CubeCell"""
+def make_payload_a(distance_mm: int, battery_mv: int) -> bytes:
+    """Payload tipo A — 4 bytes sin GPS."""
     return struct.pack(">HH", distance_mm, battery_mv)
 
 
-class TestDecodePayload:
-
-    def test_normal_reading(self):
-        """Lectura normal: río bajo, batería OK"""
-        raw = build_payload(distance_mm=2500, battery_mv=3800)
-        result = decode_payload(raw)
-
-        assert result["distance_cm"] == 250.0
-        assert result["battery_mv"] == 3800
-        assert result["battery_pct"] == 67  # round(800/1200*100) = 67
-
-    def test_critical_level(self):
-        """Distancia muy corta = río cerca del sensor = nivel crítico"""
-        raw = build_payload(distance_mm=400, battery_mv=3700)
-        result = decode_payload(raw)
-
-        assert result["distance_cm"] == 40.0
-        assert result["battery_mv"] == 3700
-
-    def test_low_battery(self):
-        """Batería casi agotada"""
-        raw = build_payload(distance_mm=2000, battery_mv=3050)
-        result = decode_payload(raw)
-
-        assert result["battery_pct"] <= 5
-
-    def test_full_battery(self):
-        """Batería llena"""
-        raw = build_payload(distance_mm=2000, battery_mv=4200)
-        result = decode_payload(raw)
-
-        assert result["battery_pct"] == 100
-
-    def test_payload_too_short(self):
-        """Payload incompleto no debe crashear"""
-        result = decode_payload(b"\x00\x01")
-        assert result == {}
-
-    def test_empty_payload(self):
-        """Payload vacío"""
-        result = decode_payload(b"")
-        assert result == {}
+def make_payload_b(distance_mm: int, battery_mv: int,
+                   lat: float, lon: float) -> bytes:
+    """Payload tipo B — 12 bytes con GPS."""
+    return struct.pack(">HHii",
+                       distance_mm, battery_mv,
+                       int(lat * 1_000_000),
+                       int(lon * 1_000_000))
 
 
-class TestBatteryCalculation:
+# ── Tipo A — sin GPS ──────────────────────────────────
 
-    @pytest.mark.parametrize("mv,expected_pct", [
-        (4200, 100),
-        (3600, 50),
-        (3000, 0),
-        (2900, 0),   # por debajo del mínimo → clamp a 0
-        (4300, 100), # por encima del máximo → clamp a 100
-    ])
-    def test_battery_pct_range(self, mv: int, expected_pct: int):
-        from app.services.decoder import _calc_battery_pct
-        assert _calc_battery_pct(mv) == expected_pct
+def test_normal_reading():
+    payload = make_payload_a(2532, 3800)
+    result = decode_payload(payload)
+    assert result["distance_cm"] == 253.2
+    assert result["battery_mv"]  == 3800
+    assert result["battery_pct"] == 67
+    assert result["has_gps"]     is False
+    assert "latitude"  not in result
+    assert "longitude" not in result
+
+
+def test_min_battery():
+    payload = make_payload_a(1000, 3000)
+    result = decode_payload(payload)
+    assert result["battery_pct"] == 0
+
+
+def test_max_battery():
+    payload = make_payload_a(1000, 4200)
+    result = decode_payload(payload)
+    assert result["battery_pct"] == 100
+
+
+def test_battery_clamp_below():
+    payload = make_payload_a(1000, 2500)
+    result = decode_payload(payload)
+    assert result["battery_pct"] == 0
+
+
+def test_battery_clamp_above():
+    payload = make_payload_a(1000, 4500)
+    result = decode_payload(payload)
+    assert result["battery_pct"] == 100
+
+
+# ── Tipo B — con GPS ──────────────────────────────────
+
+def test_payload_with_gps():
+    payload = make_payload_b(2532, 3800, 20.659699, -103.349609)
+    result = decode_payload(payload)
+    assert result["distance_cm"] == 253.2
+    assert result["battery_pct"] == 67
+    assert result["has_gps"]     is True
+    assert abs(result["latitude"]  - 20.659699)   < 0.0001
+    assert abs(result["longitude"] - (-103.349609)) < 0.0001
+
+
+def test_gps_guadalajara():
+    """Coordenadas reales de Guadalajara, Jalisco."""
+    payload = make_payload_b(1500, 3900, 20.6597, -103.3496)
+    result = decode_payload(payload)
+    assert result["has_gps"] is True
+    assert abs(result["latitude"]  - 20.6597)   < 0.001
+    assert abs(result["longitude"] - (-103.3496)) < 0.001
+
+
+def test_invalid_gps_range():
+    """GPS fuera de rango geográfico no debe incluirse."""
+    payload = make_payload_b(1500, 3900, 999.0, 999.0)
+    result = decode_payload(payload)
+    assert result["has_gps"] is False
+    assert "latitude"  not in result
+    assert "longitude" not in result
+
+
+# ── Payloads inválidos ────────────────────────────────
+
+def test_empty_payload():
+    assert decode_payload(b"") == {}
+
+
+def test_short_payload():
+    assert decode_payload(b"\x00\x01\x02") == {}
+
+
+def test_wrong_length():
+    """Longitud 8 no es ni 4 ni 12 — inválido."""
+    assert decode_payload(b"\x00" * 8) == {}
