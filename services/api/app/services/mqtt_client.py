@@ -179,6 +179,9 @@ class MQTTClient:
                 fill_pct=round(fill_pct, 1),
                 alert=alert_level,
                 battery_pct=decoded["battery_pct"],
+                has_gps=decoded.get("has_gps", False),
+                latitude=decoded.get("latitude"),
+                longitude=decoded.get("longitude"),
             )
 
         # Enviar alerta Telegram (fuera de la sesión DB)
