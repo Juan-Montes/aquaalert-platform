@@ -1,64 +1,87 @@
 """
-Decoder de payload LoRaWAN para el nodo CubeCell + JSN-SR04T.
+Decoder para payload LoRaWAN del nodo CubeCell AB02S + JSN-SR04T
 
-Formato del payload (4 bytes, big-endian):
-  Bytes 0-1 → distancia en mm  (uint16)
-  Bytes 2-3 → voltaje batería  (uint16, en mV)
+Payload tipo A — 4 bytes (sin GPS, uplink normal):
+  Bytes 0-1: distance_mm  uint16 big-endian
+  Bytes 2-3: battery_mv   uint16 big-endian
 
-Ejemplo:
-  payload hex: 09 C4 0E D8
-  distancia:   0x09C4 = 2500 mm = 250.0 cm
-  batería:     0x0ED8 = 3800 mV  = 66%
+Payload tipo B — 12 bytes (con GPS, cada N uplinks):
+  Bytes 0-1:  distance_mm  uint16 big-endian
+  Bytes 2-3:  battery_mv   uint16 big-endian
+  Bytes 4-7:  latitude     int32  big-endian (grados * 1e6)
+  Bytes 8-11: longitude    int32  big-endian (grados * 1e6)
+
+El decoder detecta el tipo por longitud del payload.
 """
-import struct
-from typing import Any
 
+import struct
 import structlog
 
-logger = structlog.get_logger()
+log = structlog.get_logger()
 
-# ─── Constantes de batería LiPo ──────────────────────
-BAT_MAX_MV = 4200
-BAT_MIN_MV = 3000
+BATTERY_MIN_MV = 3000
+BATTERY_MAX_MV = 4200
 
 
-def _calc_battery_pct(battery_mv: int) -> int:
+def decode_payload(data: bytes) -> dict:
     """
-    Convierte voltaje LiPo a porcentaje.
-    Clamp entre 0% y 100%.
-    """
-    pct = (battery_mv - BAT_MIN_MV) / (BAT_MAX_MV - BAT_MIN_MV) * 100
-    return max(0, min(100, round(pct)))
-
-
-def decode_payload(raw: bytes) -> dict[str, Any]:
-    """
-    Decodifica bytes crudos del CubeCell.
+    Decodifica payload JSN-SR04T con GPS opcional.
 
     Returns:
         dict con distance_cm, battery_mv, battery_pct
-        o dict vacío si el payload es inválido.
+        y opcionalmente latitude, longitude
+        o dict vacío si el payload es inválido
     """
-    if len(raw) < 4:
-        logger.warning("decoder.payload_too_short", length=len(raw))
+    if len(data) not in (4, 12):
+        log.warning("decoder.invalid_length", length=len(data))
         return {}
 
     try:
-        distance_mm, battery_mv = struct.unpack(">HH", raw[:4])
-
-        result = {
-            "distance_cm":  round(distance_mm / 10, 1),
-            "battery_mv":   battery_mv,
-            "battery_pct":  _calc_battery_pct(battery_mv),
-        }
-
-        logger.debug(
-            "decoder.ok",
-            distance_cm=result["distance_cm"],
-            battery_pct=result["battery_pct"],
-        )
-        return result
-
+        distance_mm, battery_mv = struct.unpack_from(">HH", data, 0)
     except struct.error as e:
-        logger.error("decoder.unpack_error", error=str(e))
+        log.warning("decoder.unpack_error", error=str(e))
         return {}
+
+    distance_cm  = round(distance_mm / 10, 1)
+    battery_pct  = _battery_percent(battery_mv)
+
+    result = {
+        "distance_cm": distance_cm,
+        "battery_mv":  battery_mv,
+        "battery_pct": battery_pct,
+        "has_gps":     False,
+    }
+
+    # Payload tipo B — incluye GPS
+    if len(data) == 12:
+        try:
+            lat_raw, lon_raw = struct.unpack_from(">ii", data, 4)
+            latitude  = round(lat_raw / 1_000_000, 6)
+            longitude = round(lon_raw / 1_000_000, 6)
+
+            # Validar rangos geográficos
+            if not (-90 <= latitude <= 90) or not (-180 <= longitude <= 180):
+                log.warning("decoder.invalid_gps",
+                            latitude=latitude, longitude=longitude)
+            else:
+                result["latitude"]  = latitude
+                result["longitude"] = longitude
+                result["has_gps"]   = True
+                log.debug("decoder.gps_ok",
+                          latitude=latitude, longitude=longitude)
+
+        except struct.error as e:
+            log.warning("decoder.gps_unpack_error", error=str(e))
+
+    log.debug("decoder.ok",
+              distance_cm=distance_cm,
+              battery_pct=battery_pct,
+              has_gps=result["has_gps"])
+
+    return result
+
+
+def _battery_percent(battery_mv: int) -> int:
+    """Calcula porcentaje de batería en rango 3.0V - 4.2V."""
+    pct = (battery_mv - BATTERY_MIN_MV) / (BATTERY_MAX_MV - BATTERY_MIN_MV) * 100
+    return max(0, min(100, round(pct)))
