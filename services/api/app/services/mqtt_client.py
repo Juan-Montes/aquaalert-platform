@@ -163,6 +163,8 @@ class MQTTClient:
                 battery_pct   = decoded["battery_pct"],
                 rssi          = rssi,
                 snr           = snr,
+                latitude      = decoded.get("latitude"),
+                longitude     = decoded.get("longitude"),
                 alert_level   = alert_level,
             )
             db.add(reading)

@@ -47,6 +47,8 @@ class SensorReading(Base):
     # ─── Calidad de señal LoRa ────────────────────────
     rssi = Column(Integer, nullable=True)   # dBm
     snr = Column(Float, nullable=True)      # dB
+    latitude     = Column(Float,   nullable=True)  # GPS lat — None si no hay fix
+    longitude    = Column(Float,   nullable=True)  # GPS lon — None si no hay fix
 
     # ─── Nivel de alerta en el momento de la lectura ──
     alert_level = Column(
