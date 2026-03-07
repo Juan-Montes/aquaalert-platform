@@ -77,7 +77,7 @@ def build_chirpstack_message(payload: bytes, device_eui: str) -> dict:
     """Construye mensaje JSON en formato ChirpStack v4 uplink."""
     return {
         "deviceInfo": {
-            "deviceEui": device_eui.upper(),
+            "devEui": device_eui.upper(),
             "deviceName": f"CubeCell-{device_eui[-4:].upper()}",
             "applicationId": "1",
         },
