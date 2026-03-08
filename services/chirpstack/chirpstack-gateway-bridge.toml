@@ -1,0 +1,20 @@
+[backend]
+  type="semtech_udp"
+
+  [backend.semtech_udp]
+    udp_bind="0.0.0.0:1700"
+
+[integration]
+  type="mqtt"
+
+  [integration.mqtt]
+    server="tcp://mosquitto:1883"
+    username=""
+    password=""
+    qos=0
+    clean_session=true
+    client_id="chirpstack-gateway-bridge"
+
+    event_topic_template="us915/gateway/{{ .GatewayID }}/event/{{ .EventType }}"
+    state_topic_template="us915/gateway/{{ .GatewayID }}/state/{{ .StateType }}"
+    command_topic_template="us915/gateway/{{ .GatewayID }}/command/#"
