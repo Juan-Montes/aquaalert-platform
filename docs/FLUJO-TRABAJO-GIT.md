@@ -559,12 +559,24 @@ Cuándo ya no necesitas --admin:
 ✅ docs/update-workflow-*       → esta guía actualizada
 ```
 
+### ✅ Feature GPS — CubeCell AB02S Air530
+```
+✅ feat/gps-payload-decoder   → decoder tipo A(4B) + tipo B(12B) con GPS
+✅ feat/gps-db-model          → columnas lat/lon en TimescaleDB + migración
+✅ feat/gps-simulator         → GPS cada 10 uplinks con ruido realista ~5m
+✅ feat/gps-grafana-map       → Geomap + panels Latitud/Longitud
+✅ fix/simulator-requirements → aiomqtt faltaba en requirements.txt
+✅ fix/simulator-device-eui   → devEui vs deviceEui en mensaje ChirpStack
+✅ fix/grafana-gps-coords     → float con decimals=6 en lugar de ROUND::text
+```
+
 ### 🔜 Fase 4 — Hardware real
 ```
 🔜 Conectar gateway Dragino DLOS8N → UDP :1700 → ChirpStack
-🔜 Registrar CubeCell en ChirpStack UI
-🔜 Primer uplink real end-to-end
-🔜 Calibrar distancia puente/sensor
+🔜 Registrar CubeCell AB02S en ChirpStack UI
+🔜 Programar firmware con payload tipo A(4B) y tipo B(12B) con GPS
+🔜 Primer uplink GPS real end-to-end
+🔜 Calibrar distancia puente/sensor en campo
 🔜 Test alertas Telegram con hardware real
 🔜 chore/securize-credentials → passwords seguros en producción
 🔜 chore/remove-version-key   → eliminar "version: 3.8" del compose
@@ -572,11 +584,123 @@ Cuándo ya no necesitas --admin:
 
 ---
 
+## 🐛 Bugs encontrados — Feature GPS
+
+### Bug 15 — pip --break-system-packages no existe en Pop OS con venv
+```
+Síntoma: no such option: --break-system-packages
+Causa:   En Pop OS con Python del sistema la flag es válida solo en
+         ciertos contextos; dentro de un venv no aplica ni se necesita
+Fix:     Crear venv primero, luego pip install normal:
+           cd services/api
+           python3 -m venv .venv
+           source .venv/bin/activate
+           pip install -r requirements.txt
+           pytest tests/
+           deactivate
+Lección: En proyectos con venv nunca usar --break-system-packages
+         Agregar .venv/ al .gitignore del proyecto
+```
+
+### Bug 16 — docker-compose (v1) vs docker compose (v2)
+```
+Síntoma: KeyError: 'ContainerConfig' al hacer docker-compose up
+Causa:   docker-compose 1.29.2 instalado con apt no es compatible
+         con imágenes modernas de Docker
+Fix:     Usar siempre docker compose (sin guión) — plugin v2 oficial
+         docker compose up -d   ← correcto
+         docker-compose up -d   ← incorrecto, nunca usar
+Lección: En Azure VM verificar con: docker compose version
+         Debe mostrar Docker Compose version v2.x.x
+```
+
+### Bug 17 — stdin redirection no funciona con docker compose exec
+```
+Síntoma: "the input device is not a TTY"
+Causa:   docker compose exec no acepta redirección < file por stdin
+Fix:     Usar -c con el SQL inline:
+           docker compose exec timescaledb psql -U user -d db -c "SQL"
+         O copiar el archivo al contenedor primero:
+           docker compose cp archivo.sql servicio:/tmp/
+           docker compose exec servicio psql -U user -d db -f /tmp/archivo.sql
+```
+
+### Bug 18 — aiomqtt faltaba en requirements del simulador
+```
+Síntoma: ModuleNotFoundError: No module named 'aiomqtt'
+Causa:   node_simulator.py fue reescrito usando aiomqtt async
+         pero requirements.txt del simulador aún tenía paho-mqtt
+Fix:     Reemplazar contenido de services/simulator/requirements.txt:
+           aiomqtt==2.0.0
+Lección: Al reescribir un servicio siempre actualizar requirements.txt
+         antes del merge — el CI no corre tests del simulador
+```
+
+### Bug 19 — devEui vs deviceEui en mensaje ChirpStack
+```
+Síntoma: mqtt.no_device_eui aunque el device estaba registrado
+Causa:   mqtt_client.py lee deviceInfo.devEui (formato ChirpStack real)
+         pero el simulador enviaba deviceInfo.deviceEui
+Fix:     En node_simulator.py build_chirpstack_message:
+           "devEui": device_eui.upper()   ← correcto
+           "deviceEui": ...               ← incorrecto
+Lección: El formato exacto del JSON de ChirpStack v4 usa devEui
+         Verificar siempre contra la documentación oficial de ChirpStack
+         o capturar un mensaje real del gateway para comparar
+```
+
+### Bug 20 — ROUND::text causa No data en Grafana stat panel
+```
+Síntoma: Panels Latitud y Longitud mostraban "No data"
+Causa:   Query usaba ROUND(latitude::numeric, 6)::text
+         Grafana time_series no puede graficar columnas de texto
+Fix:     Usar el float directamente sin cast:
+           SELECT time, latitude as "Latitud" FROM ...
+         Configurar decimals=6 en fieldConfig del panel
+Lección: Grafana time_series solo acepta columnas numéricas
+         Para controlar decimales usar fieldConfig.defaults.decimals
+         nunca castear a texto dentro del SQL
+```
+
+---
+
+## 📡 Diseño del payload GPS — CubeCell AB02S
+
+```
+Payload tipo A — 4 bytes (uplinks normales, sin GPS):
+  Bytes 0-1: distance_mm  uint16 big-endian
+  Bytes 2-3: battery_mv   uint16 big-endian
+
+Payload tipo B — 12 bytes (cada GPS_INTERVAL uplinks):
+  Bytes 0-1:  distance_mm  uint16 big-endian
+  Bytes 2-3:  battery_mv   uint16 big-endian
+  Bytes 4-7:  latitude     int32  big-endian (grados * 1,000,000)
+  Bytes 8-11: longitude    int32  big-endian (grados * 1,000,000)
+
+Ejemplos de encoding:
+  lat  20.659703 → int32(20659703)  → 0x013B5337
+  lon -103.34959 → int32(-103349590)→ 0xF9C2F06A
+
+Decoder detecta tipo por len(data):
+  4  bytes → tipo A → has_gps=False → usar última posición conocida
+  12 bytes → tipo B → has_gps=True  → actualizar posición en DB
+  otro     → inválido → return {}
+
+Estrategia de batería para sensor semi-fijo:
+  GPS_INTERVAL=10 → 90% uplinks son 4 bytes (mínimo consumo)
+                  → 10% uplinks son 12 bytes (actualización GPS)
+  Configurable via env var GPS_INTERVAL en docker-compose.yml
+```
+
+---
+
 ## 🏗️ Arquitectura del stack
 
 ```
-Nodo CubeCell AB02 + JSN-SR04T
+Nodo CubeCell AB02S + JSN-SR04T + GPS Air530
     ↓ LoRaWAN 915MHz (US915 sub-band 0)
+    ↓ Payload tipo A (4B) cada uplink normal
+    ↓ Payload tipo B (12B) cada 10 uplinks con GPS
 Gateway Dragino DLOS8N
     ↓ UDP :1700
 ChirpStack Gateway Bridge :1700
@@ -585,15 +709,25 @@ ChirpStack v4 Network Server :8080
     ↓ MQTT topic: application/+/device/+/event/up
 FastAPI mqtt_client.py
     ├── decoder.py       → bytes → distance_cm, battery_pct
+    │                      + latitude, longitude (payload tipo B)
     ├── alert_service.py → fill_pct → NORMAL/WATCH/WARNING/CRITICAL
     │                      → Telegram Bot notificaciones push
     └── TimescaleDB      → SensorReading hypertable
+         columns: distance_cm, water_level_cm, fill_pct,
+                  battery_mv, battery_pct, rssi, snr,
+                  alert_level, latitude, longitude
          ↓
-      Grafana :3000      → 8 panels en tiempo real
+      Grafana :3000      → 11 panels en tiempo real
+         ├── Estado actual (4 stats)
+         ├── Histórico (timeseries + gauge)
+         ├── Señal LoRa y Batería (2 timeseries)
+         └── Ubicación GPS (Geomap + Latitud + Longitud)
       /docs   :8000      → Swagger UI
 
 Simulador (desarrollo sin hardware):
   node_simulator.py → MQTT → mismo pipeline ↑
+  GPS_INTERVAL=10   → payload B cada 10 uplinks
+  BASE_LAT/LON      → coordenadas configurables por env var
 ```
 
 ---
@@ -629,7 +763,7 @@ Mensaje incluye:
 
 *Proyecto: AquaAlert IoT Platform*
 *Stack: LoRaWAN + ChirpStack v4 + FastAPI + TimescaleDB + Grafana*
-*Hardware: Heltec CubeCell AB02 + JSN-SR04T + Dragino DLOS8N*
+*Hardware: Heltec CubeCell AB02S (GPS Air530) + JSN-SR04T + Dragino DLOS8N*
 *CI/CD: GitHub Actions + Docker Compose*
 *Infraestructura: Azure VM Ubuntu + Docker*
 *Desarrollado en Guadalajara, Jalisco, México 🇲🇽*
