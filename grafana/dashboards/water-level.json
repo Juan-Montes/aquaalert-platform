@@ -804,8 +804,9 @@
             "mode": "fixed",
             "fixedColor": "blue"
           },
-          "unit": "string",
-          "custom": {}
+          "unit": "none",
+          "custom": {},
+          "decimals": 6
         },
         "overrides": []
       },
@@ -836,7 +837,7 @@
             "type": "postgres",
             "uid": "timescaledb"
           },
-          "rawSql": "SELECT time, ROUND(latitude::numeric, 6)::text as \"Latitud\" FROM sensor_readings WHERE device_eui = '$device_eui' AND latitude IS NOT NULL ORDER BY time DESC LIMIT 1",
+          "rawSql": "SELECT time, latitude as \"Latitud\" FROM sensor_readings WHERE device_eui = '$device_eui' AND latitude IS NOT NULL ORDER BY time DESC LIMIT 1",
           "format": "time_series",
           "refId": "A"
         }
@@ -853,8 +854,9 @@
             "mode": "fixed",
             "fixedColor": "blue"
           },
-          "unit": "string",
-          "custom": {}
+          "unit": "none",
+          "custom": {},
+          "decimals": 6
         },
         "overrides": []
       },
@@ -885,7 +887,7 @@
             "type": "postgres",
             "uid": "timescaledb"
           },
-          "rawSql": "SELECT time, ROUND(longitude::numeric, 6)::text as \"Longitud\" FROM sensor_readings WHERE device_eui = '$device_eui' AND longitude IS NOT NULL ORDER BY time DESC LIMIT 1",
+          "rawSql": "SELECT time, longitude as \"Longitud\" FROM sensor_readings WHERE device_eui = '$device_eui' AND longitude IS NOT NULL ORDER BY time DESC LIMIT 1",
           "format": "time_series",
           "refId": "A"
         }
@@ -925,5 +927,5 @@
   "timezone": "America/Mexico_City",
   "title": "AquaAlert — Monitor de Nivel",
   "uid": "aquaalert-water-level",
-  "version": 5
+  "version": 6
 }
