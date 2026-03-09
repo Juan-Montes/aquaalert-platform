@@ -28,7 +28,7 @@ services:
     ports:
       - "1700:1700/udp"   # Tu Dragino apunta aquí
     volumes:
-      - ./services/chirpstack/chirpstack-gateway-bridge.toml:/etc/chirpstack-gateway-bridge/chirpstack-gateway-bridge.toml
+      - ./services/chirpstack-gateway-bridge/chirpstack-gateway-bridge.toml:/etc/chirpstack-gateway-bridge/chirpstack-gateway-bridge.toml
     command: ["--config", "/etc/chirpstack-gateway-bridge/chirpstack-gateway-bridge.toml"]
     depends_on:
       - mosquitto
