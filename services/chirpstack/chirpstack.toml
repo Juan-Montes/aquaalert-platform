@@ -31,7 +31,7 @@ tls_key  = ""
 type="mqtt"
 
 [gateway.backend.mqtt]
-topic_prefix="us915"
+topic_prefix="us915_0"
 server="tcp://mosquitto:1883"
 username=""
 password=""
