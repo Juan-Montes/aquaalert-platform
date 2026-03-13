@@ -8,9 +8,9 @@
   marshaler="protobuf"
 
   [integration.mqtt]
-    event_topic_template="us915/gateway/{{ .GatewayID }}/event/{{ .EventType }}"
-    state_topic_template="us915/gateway/{{ .GatewayID }}/state/{{ .StateType }}"
-    command_topic_template="us915/gateway/{{ .GatewayID }}/command/#"
+    event_topic_template="us915_0/gateway/{{ .GatewayID }}/event/{{ .EventType }}"
+    state_topic_template="us915_0/gateway/{{ .GatewayID }}/state/{{ .StateType }}"
+    command_topic_template="us915_0/gateway/{{ .GatewayID }}/command/#"
 
     [integration.mqtt.auth]
       type="generic"
