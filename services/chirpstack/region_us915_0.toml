@@ -1,0 +1,19 @@
+[[regions]]
+id = "us915_0"
+description = "US915 sub-band 0"
+common_name = "US915"
+
+[regions.gateway]
+[regions.gateway.backend]
+type = "mqtt"
+
+[regions.gateway.backend.mqtt]
+topic_prefix = "us915_0"
+
+[regions.gateway.backend.mqtt.auth]
+type = "generic"
+
+[regions.gateway.backend.mqtt.auth.generic]
+servers = [
+  "tcp://mosquitto:1883",
+]
