@@ -32,12 +32,14 @@ type="mqtt"
 
 [gateway.backend.mqtt]
 topic_prefix="us915_0"
-server="tcp://mosquitto:1883"
-username=""
-password=""
-qos=0
-clean_session=true
-client_id="chirpstack-gateway"
+
+[gateway.backend.mqtt.auth]
+type="generic"
+
+[gateway.backend.mqtt.auth.generic]
+servers=[
+  "tcp://mosquitto:1883",
+]
 
 [integration]
 enabled = ["mqtt"]
