@@ -9,6 +9,7 @@ services:
     restart: unless-stopped
     volumes:
       - ./services/chirpstack/chirpstack.toml:/etc/chirpstack/chirpstack.toml
+      - ./services/chirpstack/region_us915_0.toml:/etc/chirpstack/region_us915_0.toml
     depends_on:
       - postgres
       - mosquitto
