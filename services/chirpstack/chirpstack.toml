@@ -27,19 +27,6 @@ ca_cert  = ""
 tls_cert = ""
 tls_key  = ""
 
-[gateway.backend]
-type="mqtt"
-
-[gateway.backend.mqtt]
-topic_prefix="us915_0"
-
-[gateway.backend.mqtt.auth]
-type="generic"
-
-[gateway.backend.mqtt.auth.generic]
-servers=[
-  "tcp://mosquitto:1883",
-]
 
 [integration]
 enabled = ["mqtt"]
