@@ -767,3 +767,155 @@ Mensaje incluye:
 *CI/CD: GitHub Actions + Docker Compose*
 *Infraestructura: Azure VM Ubuntu + Docker*
 *Desarrollado en Guadalajara, Jalisco, México 🇲🇽*
+
+---
+
+## 🐛 Bugs Fase 4 — Hardware Integration (ChirpStack + CubeCell)
+
+### Bug #16 — Docker phantom directory: volumen de directorio completo
+**Síntoma:** `Error: Read config file: /etc/chirpstack/chirpstack-gateway-bridge.toml — Is a directory`  
+**Causa:** `docker-compose.yml` montaba `./services/chirpstack:/etc/chirpstack` (directorio completo). Al existir un archivo con el mismo nombre en otra ruta, Docker creaba un directorio vacío en su lugar.  
+**Fix:** Montar archivos individuales, nunca directorios completos:
+```yaml
+volumes:
+  - ./services/chirpstack/chirpstack.toml:/etc/chirpstack/chirpstack.toml
+  - ./services/chirpstack/region_us915_0.toml:/etc/chirpstack/region_us915_0.toml
+```
+**Lección:** Docker crea un directorio vacío (root:root) cuando el archivo fuente no existe al momento del bind mount. Solución: `sudo rm -rf <phantom_dir>` + recrear contenedor con `docker compose stop/rm -f/up -d`.
+
+---
+
+### Bug #17 — Duplicate key [integration] en chirpstack.toml
+**Síntoma:** `TOML parse error at line 67: duplicate key [integration]`  
+**Causa:** ChirpStack carga **todos** los `.toml` del directorio `/etc/chirpstack/`. El archivo `chirpstack-gateway-bridge.toml` (que también tenía `[integration]`) estaba en el mismo directorio.  
+**Fix:** Mover el config del bridge a `services/chirpstack-gateway-bridge/` y actualizar el volumen:
+```yaml
+chirpstack-gateway-bridge:
+  volumes:
+    - ./services/chirpstack-gateway-bridge/chirpstack-gateway-bridge.toml:/etc/chirpstack-gateway-bridge/chirpstack-gateway-bridge.toml
+```
+
+---
+
+### Bug #18 — Gateway bridge volume path incorrecto después de mover archivo
+**Síntoma:** `error loading config file: is a directory`  
+**Causa:** El `docker-compose.yml` aún apuntaba a `./services/chirpstack/chirpstack-gateway-bridge.toml` (ruta antigua) después de mover el archivo a `./services/chirpstack-gateway-bridge/`.  
+**Fix:** Actualizar el path del volumen en `docker-compose.yml` al nuevo directorio.
+
+---
+
+### Bug #19 — ChirpStack gateway MQTT no suscribe a topics de gateway
+**Síntoma:** ChirpStack solo suscribe a `application/+/device/+/command/+`, nunca a `us915_0/gateway/+/event/+`. Gateway aparece como "Never seen" en UI.  
+**Causa raíz A:** `topic_prefix="us915"` en el bridge no coincidía con el region ID `us915_0` de ChirpStack.  
+**Causa raíz B:** ChirpStack v4.15 requiere la configuración del gateway backend en un **archivo de región separado**, no en `chirpstack.toml`.  
+**Fix:** Crear `services/chirpstack/region_us915_0.toml` con:
+```toml
+[[regions]]
+  id="us915_0"
+  description="US915 sub-band 0"
+  common_name="US915"
+
+  [regions.gateway.backend.mqtt]
+    topic_prefix="us915_0"
+    server="tcp://mosquitto:1883"
+    username=""
+    password=""
+    qos=0
+    clean_session=true
+    client_id="chirpstack-gateway-us915"
+```
+Y montarlo en `docker-compose.yml` como volumen adicional del servicio `chirpstack`.
+
+---
+
+### Bug #20 — region_us915_0.toml no montado en contenedor
+**Síntoma:** ChirpStack no encuentra la config de región aunque el archivo existe en el host.  
+**Causa:** El archivo fue creado pero no se agregó como volumen en `docker-compose.yml`.  
+**Fix:** Agregar segundo volumen al servicio `chirpstack`:
+```yaml
+- ./services/chirpstack/region_us915_0.toml:/etc/chirpstack/region_us915_0.toml
+```
+
+---
+
+### Bug #21 — CubeCell: `BoardGetBatteryVoltage` undefined
+**Síntoma:** Error de compilación: `undefined reference to 'BoardGetBatteryVoltage'`  
+**Causa:** La función correcta en CubeCell SDK v1.4.0 es `getBatteryVoltage()` (minúscula, sin prefijo Board).  
+**Fix:** Reemplazar todas las llamadas a `BoardGetBatteryVoltage()` por `getBatteryVoltage()`.
+
+---
+
+### Bug #22 — CubeCell: `lorawanAdr` undefined (W mayúscula)
+**Síntoma:** Error de compilación: `undefined reference to 'loraWanAdr'`  
+**Causa:** La librería LoRaWan_APP.cpp v1.4.0 busca `loraWanAdr` (W mayúscula). Declarar `lorawanAdr` (todo minúsculas) no resuelve el símbolo.  
+**Fix:** Declarar la variable con W mayúscula: `bool loraWanAdr = LORAWAN_ADR;`
+
+---
+
+### Bug #23 — GPS_Air530 contamina Serial con NMEA
+**Síntoma:** Serial Monitor lleno de caracteres basura (`$GPGGA...`, símbolos `§ÿ`) mezclados con los prints del sketch.  
+**Causa:** La librería `GPS_Air530` redirige su salida NMEA al mismo `Serial` (USB). Al llamar `GPS.begin()` sin especificar un serial alternativo, los datos GPS se mezclan con los logs del usuario.  
+**Fix:** Eliminar la librería GPS por ahora. Cuando se reactive, usar `GPS_Air530Z` o inicializar GPS en `Serial1` separado del Serial USB.
+
+---
+
+### Bug #24 — Dispositivo real no guardaba en DB (unknown_device)
+**Síntoma:** `mqtt.unknown_device device=D08905AAACD756FE hint=Register it via POST /api/v1/devices`  
+**Causa:** El CubeCell real (DevEUI `D08905AAACD756FE`) no estaba registrado en la tabla `devices` de la FastAPI/TimescaleDB. El API descarta uplinks de dispositivos no registrados.  
+**Fix:** Registrar el dispositivo vía API:
+```bash
+curl -X POST http://localhost:8000/api/v1/devices/ \
+  -H "Content-Type: application/json" \
+  -d '{
+    "device_eui": "D08905AAACD756FE",
+    "name": "cubecell-ab02s",
+    "location": "AquaAlert Sensor #1"
+  }'
+```
+**Nota:** El endpoint requiere trailing slash `/` o devuelve 307 Redirect.
+
+---
+
+### Bug #25 — Grafana no mostraba datos del dispositivo real
+**Síntoma:** Dashboard congelado en último valor del simulador. Datos reales en DB pero no visibles en Grafana.  
+**Causa:** La variable Grafana `$device_eui` no tenía valor seleccionado para el nuevo dispositivo real.  
+**Fix:** En el dashboard, el dropdown **"Dispositivo"** (parte superior) hace `SELECT DISTINCT device_eui FROM sensor_readings`. Al seleccionar `D08905AAACD756FE` en el dropdown, todos los panels se actualizan automáticamente.
+
+---
+
+## 📦 Firmware CubeCell AB02S
+
+**Ubicación en repo:** `firmware/cubecell-ab02s/aquaalert_cubecell.ino`
+
+**Configuración Arduino IDE:**
+```
+Board:   CubeCell-GPS (HTCC-AB02S)
+Region:  REGION_US915
+Class:   CLASS_A
+Mode:    OTAA
+```
+
+**Pines JSN-SR04T:**
+```
+TRIG → GPIO1
+ECHO → GPIO2
+VCC  → 5V
+GND  → GND
+```
+
+**Variables requeridas (CubeCell SDK v1.4.0):**
+```cpp
+bool loraWanAdr = LORAWAN_ADR;   // W mayúscula obligatorio
+bool keepNet    = LORAWAN_NET_RESERVE;
+uint16_t userChannelsMask[6] = { 0xFF00, ... };
+uint32_t devAddr = ...;
+uint8_t nwkSKey[] = ...;
+uint8_t appSKey[]  = ...;
+```
+
+**Credenciales del dispositivo:**
+```
+DevEUI:  D08905AAACD756FE
+AppEUI:  0000000000000000
+AppKey:  98D902752D8C36041450BBD5365578DE
+```
