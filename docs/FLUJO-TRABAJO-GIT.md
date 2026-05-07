@@ -883,6 +883,18 @@ curl -X POST http://localhost:8000/api/v1/devices/ \
 
 ---
 
+### Bug #26 — pg_trgm extension faltante en PostgreSQL al reiniciar
+**Síntoma:** `Error: Failed to run 00000000000000_initial with: operator class "gin_trgm_ops" does not exist`  
+**Causa:** El `init.sql` solo se ejecuta cuando el volumen se crea por primera vez. Si el volumen existía de una inicialización anterior sin la extensión, ChirpStack falla en cada arranque.  
+**Fix manual:**
+```bash
+docker compose exec postgres psql -U chirpstack -d chirpstack \
+  -c "CREATE EXTENSION IF NOT EXISTS pg_trgm; CREATE EXTENSION IF NOT EXISTS \"uuid-ossp\";"
+docker compose restart chirpstack
+```
+**Nota:** Después de este fix queda permanente en el volumen. No se necesita repetir.
+
+
 ## 📦 Firmware CubeCell AB02S
 
 **Ubicación en repo:** `firmware/cubecell-ab02s/aquaalert_cubecell.ino`
